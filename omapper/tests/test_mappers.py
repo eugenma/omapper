@@ -1,4 +1,3 @@
-import copy
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Sequence, Optional
@@ -23,6 +22,10 @@ class TestImplicitFullyAnnotated(TestCase):
         def __init__(self, first: str, second: str):
             self.first = first
             self.second = second
+
+    class Simple:
+        def __init__(self, attr):
+            self.attr = attr
 
     def test_implicit_object(self):
         source = self.Source()
@@ -96,19 +99,6 @@ class TestImplicitFullyAnnotated(TestCase):
         self.assertEqual(source.third, dest.third, msg="Identity map should pass references and not values.")
         self.assertEqual(source.third[-1], 111, "Value was added through 'dest'")
 
-    def test_copy_mapper(self):
-        mapper = Mapper(self.Source, self.Source, mappers={
-            'first': lambda src: copy.copy(src.first),
-            'second': lambda src: copy.copy(src.second),
-            'third': lambda src: copy.copy(src.third),
-        })
-
-        source = self.Source()
-        dest = mapper(source)
-        dest.third.append(111)
-
-        self.assertNotIn(111, source.third)
-
     def test_implicit_default_mapper(self):
         mapper = Mapper(self.Source, self.Source, default_mapper=lambda dest_attr: lambda src: getattr(src, dest_attr))
 
@@ -118,37 +108,19 @@ class TestImplicitFullyAnnotated(TestCase):
         self.assertEqual(dest.second, "BBB")
         self.assertEqual(dest.third, "CCC")
 
-    class Deep:
-        def __init__(self, attr):
-            self.attr = attr
-
-    def test_deepcopy_mapper(self):
-        mapper = Mapper(self.Deep, self.Deep, mappers={
-            'attr': lambda s: copy.deepcopy(s.attr),
-        })
-
-        value = {'a': [1, 2, 3]}
-        source = self.Deep(value)
-        dest = mapper(source)
-        dest.attr['unexpected'] = [22, 33, ]
-        dest.attr['a'].append(111)
-
-        self.assertNotIn('unexpected', source.attr)
-        self.assertNotIn(111, source.attr['a'])
-
     def test_missing_target_mapper_key(self):
         def create_exception():
-            return Mapper(self.Deep, self.Deep, mappers={
+            return Mapper(self.Simple, self.Simple, mappers={
                 'missing_target': lambda s: s.attr,
             })
         self.assertRaises(ValueError, create_exception)
 
     def test_missing_source_in_mapper(self):
-        mapper = Mapper(self.Deep, self.Deep, mappers={
+        mapper = Mapper(self.Simple, self.Simple, mappers={
             'attr': lambda s: s.missing_source,
         })
 
-        source = self.Deep(123)
+        source = self.Simple(123)
         self.assertRaises(AttributeError, lambda: mapper(source))
 
     def test_exception_in_ctor(self):
