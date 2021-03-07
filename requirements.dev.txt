@@ -2,3 +2,4 @@ coverage==5.5
 pytest-cov==2.11.1
 mypy==0.812
 pytest-mypy==0.8.0
+pytest-flake8==1.0.7

@@ -2,11 +2,6 @@ import collections
 import inspect
 from typing import Callable, Any, Sequence, OrderedDict, Optional, MutableMapping, Dict, Mapping, Iterator, Tuple
 
-try:
-    from typing import get_origin, get_args
-except ImportError:
-    raise ImportError("Requires Python Version >= 3.8")
-
 
 MapEntry = Callable[[Any, ], Any]
 DefaultMapper = Callable[[str], MapEntry]
