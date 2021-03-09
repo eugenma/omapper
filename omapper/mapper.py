@@ -1,10 +1,10 @@
 import collections
 import inspect
-from typing import Callable, Any, Sequence, OrderedDict, Optional, MutableMapping, Dict, Mapping, Iterator, Tuple
+from functools import partial
+from typing import Any, Sequence, OrderedDict, Optional, MutableMapping, Dict, Mapping, Iterator, Tuple
 
-
-MapEntry = Callable[[Any, ], Any]
-DefaultMapper = Callable[[str], MapEntry]
+from .omapper_types import DefaultMapper, MapEntry
+from .exceptions import InstantiationError, AttributeMappingError
 
 
 class Mapper:
@@ -16,7 +16,8 @@ class Mapper:
 
         dest_attrs = Mapper.__get_all_attrs(dest_type)
         if not dest_attrs:
-            raise ValueError(f"The type of 'dest_type' {dest_type} does not has any parameters in the constructor.")
+            msg = f"The type of 'dest_type' {dest_type.__qualname__} does not has any parameters in the constructor."
+            raise ValueError(msg)
 
         if explicit:
             self.__check_explicit_only(self.mappers, dest_attrs, dest_type)
@@ -29,21 +30,26 @@ class Mapper:
         self.__check_missing_dest_attrs(self.mappers, dest_attrs, dest_type)
 
     def __call__(self, src: Any) -> Any:
-        values = self._mapped_values(src)
+        """Apply the mapping on src.
+
+        :raise AttributeMappingError if map of an attribute failed.
+        """
+        values = self.__mapped_values(src)
         try:
             return self.dest_type(**values)
         except Exception:
-            str_values = map(lambda e: f'"{e[0]}"="{repr(e[1])}"', values.items())
-            joined = ', '.join(str_values)
-            msg = f"Failed to create dest '{self.dest_type}' with params {joined}."
-            raise ValueError(msg)
+            raise InstantiationError(self.dest_type, values)
 
-    def _mapped_values(self, src: Any) -> OrderedDict[str, Any]:
-        values = collections.OrderedDict()
-        for dest_attr, mapper in self.mappers.items():
-            dest_value = mapper(src)
-            values[dest_attr] = dest_value
-        return values
+    def __mapped_values(self, src: Any) -> OrderedDict[str, Any]:
+        values_it = map(partial(self.__map_attribute, src), self.mappers.items())
+        return collections.OrderedDict(values_it)
+
+    def __map_attribute(self, src: Any, dest_attr_mapper: Tuple[str, MapEntry]) -> Tuple[str, Any]:
+        dest_attr, mapper = dest_attr_mapper
+        try:
+            return dest_attr, mapper(src)
+        except Exception:
+            raise AttributeMappingError(self.dest_type, dest_attr, src, mapper)
 
     @staticmethod
     def __get_all_attrs(dest_type: type) -> Sequence[str]:
@@ -56,9 +62,11 @@ class Mapper:
     @staticmethod
     def __check_explicit_only(mappers, dest_attrs: Sequence[str], dest_type: type) -> None:
         missing_attrs = [e for e in dest_attrs if e not in mappers]
-        missing_attrs_str = ', '.join(f"'{dest_type.__name__}.{e}'" for e in missing_attrs)
+        missing_attrs_str = ', '.join(f"'{e}'" for e in missing_attrs)
         if missing_attrs_str:
-            raise ValueError(f"Explicit Mapper is missing maps to following target fields {missing_attrs_str}.")
+            msg = f"Explicit Mapper is missing maps to following target type '{dest_type.__qualname__}'" \
+                + "and  fields {missing_attrs_str}."
+            raise ValueError(msg)
 
     @staticmethod
     def __check_missing_dest_attrs(mappers, dest_attrs, dest_type):
@@ -66,7 +74,7 @@ class Mapper:
         if missing:
             mapper_keys = ', '.join((f"'{k}'" for k in missing))
             raise ValueError(
-                f"Configured attributes {mapper_keys} not found in target ctor '{dest_type}'. "
+                f"Configured attributes {mapper_keys} not found in target ctor '{dest_type.__qualname__}'. "
                 f"Available attributes {dest_attrs}.")
 
     @staticmethod

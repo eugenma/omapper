@@ -4,6 +4,7 @@ from typing import Sequence, Optional
 from unittest import TestCase
 
 from omapper import Mapper
+from omapper.exceptions import AttributeMappingError, InstantiationError
 
 
 class TestImplicitFullyAnnotated(TestCase):
@@ -50,6 +51,18 @@ class TestImplicitFullyAnnotated(TestCase):
 
         self.assertEqual(expected.dt, actual.dt)
         self.assertEqual(expected.third, actual.third)
+
+    def test_mapping_with_exception(self):
+        # noinspection PyUnusedLocal
+        def exception(src):
+            raise ValueError("Failed!!")
+
+        mapper = Mapper(self.Simple, self.Simple, mappers={
+            'attr': exception
+        })
+
+        src = self.Simple(123)
+        self.assertRaises(AttributeMappingError, lambda: mapper(src))
 
     def test_explicit_erroneous(self):
         self.assertRaises(
@@ -115,14 +128,6 @@ class TestImplicitFullyAnnotated(TestCase):
             })
         self.assertRaises(ValueError, create_exception)
 
-    def test_missing_source_in_mapper(self):
-        mapper = Mapper(self.Simple, self.Simple, mappers={
-            'attr': lambda s: s.missing_source,
-        })
-
-        source = self.Simple(123)
-        self.assertRaises(AttributeError, lambda: mapper(source))
-
     def test_exception_in_ctor(self):
         class Target:
             def __init__(self, first):
@@ -131,7 +136,7 @@ class TestImplicitFullyAnnotated(TestCase):
         mapper = Mapper(self.Source, Target)
 
         src = self.Source()
-        self.assertRaises(ValueError, lambda: mapper(src))
+        self.assertRaises(InstantiationError, lambda: mapper(src))
 
     def test_target_has_empty_ctor(self):
         class Target:
