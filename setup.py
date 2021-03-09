@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='omapper',
-      version='0.0.1',
+      version='0.0.1-alpha.1',
       description='Object Mapper',
       long_description='Object Mapper',
       classifiers=[
